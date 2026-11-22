@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sodium & Volume Grid</title>
+<style>
+:root{
+  --bg:#f6f4ef; --panel:#ffffff; --ink:#1d2330; --muted:#6b7280; --line:#e3ded3;
+  --icf:#6c5ce7; --icf-soft:#e7e3ff; --ecf:#0aa5a5; --ecf-soft:#d7f4f2;
+  --na:#e0a800; --k:#8f7cf0; --water:#3b82f6; --accent:#e4572e;
+  --hypo:#2563eb; --hyper:#d9481f; --iso:#64748b; --sel:#1d2330;
+  --plasma:#fbd9d5; --wall:#c0392b; --rbc:#d9443a; --rbcpal:#f4aaa2;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12151c; --panel:#1a1f29; --ink:#e8ebf2; --muted:#9aa3b2; --line:#2a313e;
+    --icf:#9b8cff; --icf-soft:#2a2550; --ecf:#2fd0c8; --ecf-soft:#123a3a;
+    --na:#ffc933; --k:#b3a6ff; --water:#7cc4ff; --accent:#ff7a52; --sel:#e8ebf2;
+    --hypo:#3b82f6; --hyper:#e4572e; --iso:#5b6678;
+    --plasma:#4a1d24; --wall:#ff8a80; --rbc:#ef5350; --rbcpal:#8e2a27;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12151c; --panel:#1a1f29; --ink:#e8ebf2; --muted:#9aa3b2; --line:#2a313e;
+  --icf:#9b8cff; --icf-soft:#2a2550; --ecf:#2fd0c8; --ecf-soft:#123a3a;
+  --na:#ffc933; --k:#b3a6ff; --water:#7cc4ff; --accent:#ff7a52; --sel:#e8ebf2;
+    --hypo:#3b82f6; --hyper:#e4572e; --iso:#5b6678;
+    --plasma:#4a1d24; --wall:#ff8a80; --rbc:#ef5350; --rbcpal:#8e2a27;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif}
+header{padding:20px 20px 6px;max-width:1240px;margin:0 auto}
+h1{margin:0;font-size:22px;letter-spacing:-.01em}
+.sub{color:var(--muted);margin-top:4px;font-size:14px}
+main{max-width:1240px;margin:0 auto;padding:12px 20px 40px;display:grid;grid-template-columns:400px 1fr;gap:18px}
+@media(max-width:900px){main{grid-template-columns:1fr;padding:12px 16px 40px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.topt{max-width:1240px;margin:6px auto 0;padding:0 20px}
+@media(max-width:900px){.topt{padding:0 16px}}
+.topt button{flex:0 1 180px}
+main.all{grid-template-columns:1fr}
+main.all section.play{display:none}
+.allgrid{display:grid;grid-template-columns:30px repeat(3,1fr);gap:8px}
+.acell{border:1.5px solid var(--line);border-radius:12px;padding:10px;background:var(--bg);cursor:pointer;font-size:13px;transition:transform .15s,border-color .15s}
+.acell:hover{transform:translateY(-2px);border-color:var(--ink)}
+.acell svg{width:120px;height:62px;float:right;margin:0 0 4px 8px}
+.acell h3{margin:0 0 4px;font-size:14.5px}
+.acell p{margin:4px 0}
+.acell .lb{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.acell .tg{display:none;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase}
+@media(max-width:760px){.allgrid{grid-template-columns:1fr}.allgrid .colh,.allgrid .rowh,.allgrid .sp{display:none}.acell .tg{display:block}}
+
+.tabs button{flex:1;border:1px solid var(--line);background:transparent;color:var(--ink);padding:7px;border-radius:9px;cursor:pointer;font-weight:600}
+.tabs button.on{background:var(--ink);color:var(--bg)}
+/* grid */
+.gridwrap{display:grid;grid-template-columns:26px repeat(3,1fr);grid-template-rows:auto repeat(3,1fr);gap:6px}
+.colh,.rowh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center}
+.rowh{writing-mode:vertical-rl;transform:rotate(180deg)}
+.cell{border:1.5px solid var(--line);border-radius:10px;padding:6px 6px 4px;cursor:pointer;background:var(--bg);transition:transform .15s,border-color .15s,box-shadow .15s;min-height:104px;display:flex;flex-direction:column}
+.cell:hover{transform:translateY(-2px)}
+.cell.on{border-color:var(--sel);box-shadow:0 0 0 2px var(--sel) inset}
+.cell.live{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+.cell svg{width:100%;height:58px}
+.cell .t{font-size:11.5px;font-weight:700;line-height:1.2;margin-top:2px}
+.cell .e{font-size:10.5px;color:var(--muted);line-height:1.2}
+/* stage */
+.stage svg{width:100%;height:auto;display:block}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.btn{border:0;background:var(--accent);color:#fff;font-weight:700;padding:8px 14px;border-radius:9px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.phase{font-size:13px;color:var(--muted);min-height:20px}
+.read{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.read div{border:1px solid var(--line);border-radius:10px;padding:7px 9px}
+.read b{display:block;font-size:19px;font-variant-numeric:tabular-nums}
+.read span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+@media(max-width:560px){.read{grid-template-columns:repeat(2,1fr)}}
+.info h2{margin:2px 0 4px;font-size:18px}
+.info .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-right:4px}
+.info dl{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;margin:10px 0 0}
+@media(max-width:560px){.info dl{grid-template-columns:1fr}}
+.info dt{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.info dd{margin:0}
+.sliders label{display:block;font-size:13px;font-weight:600;margin-top:10px}
+.sliders input{width:100%}
+.sliders .v{float:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.halo{paint-order:stroke;stroke:var(--panel);stroke-width:3.5px;stroke-linejoin:round}
+.themebtn{float:right;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:99px;padding:5px 12px;cursor:pointer;font-weight:600;font-size:13px}
+input[type=range]{accent-color:var(--accent)}
+.why{display:block;margin-top:10px;font-size:13px;cursor:pointer}
+.whybox{background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:8px 10px;margin-top:10px;font-size:13.5px}
+#cellv{margin-top:10px;border-top:1px solid var(--line);padding-top:6px}
+.quick button{font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:99px;padding:4px 10px;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <button class="themebtn" id="theme" aria-label="Toggle dark mode">☾ Dark</button>
+  <h1>Sodium × Volume: the 3×3</h1>
+  <div class="sub">Rows = sodium (osmolality). Columns = ECF volume. Each box is a Darrow-Yannet diagram: <b>width = volume, height = osmolality</b>, cells (ICF) on the left and extracellular fluid (ECF) on the right.</div>
+</header>
+<nav class="tabs topt"><button id="tabGrid" class="on">Explore the grid</button><button id="tabLab">Fluid lab</button><button id="tabAll">All causes</button></nav>
+<main id="main">
+  <section class="play">
+    <div class="card">
+      <div id="gridPane">
+        <div class="gridwrap" id="grid"></div>
+        <div class="note">Tap a cell to play what happens to the body's water.</div>
+        <label class="why"><input type="checkbox" id="why"> <b>Why?</b> Show what really happens over time <span class="note">(SIADH, DI)</span></label>
+      </div>
+      <div id="labPane" class="sliders" hidden>
+        <label>Water gained / lost <span class="v" id="wV"></span><input id="w" type="range" min="-6" max="8" step="0.5" value="0"></label>
+        <label>Sodium gained / lost <span class="v" id="nV"></span><input id="n" type="range" min="-900" max="900" step="50" value="0"></label>
+        <div class="quick">
+          <button data-w="1" data-n="154">+1 L normal saline</button>
+          <button data-w="1" data-n="513">+1 L 3% saline</button>
+          <button data-w="1" data-n="0">+1 L D5W</button>
+          <button data-w="-1" data-n="-154">−1 L isotonic loss</button>
+          <button data-w="-1" data-n="-40">−1 L sweat</button>
+          <button data-w="0" data-n="0" data-reset="1">Reset</button>
+        </div>
+        <div class="note">Fluid enters or leaves the ECF first, then water redistributes. The grid cell you land in lights up orange.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="play">
+    <div class="card stage">
+      <svg id="dy" viewBox="0 0 720 360" role="img" aria-label="Darrow-Yannet diagram"></svg>
+      <div class="legend">
+        <span><i style="background:var(--k)"></i>K⁺ (inside cells, 71 mOsm each)</span>
+        <span><i style="background:var(--na)"></i>Na⁺ (outside cells, 71 mOsm each)</span>
+        <span><i style="background:var(--water)"></i>water (0.25 L each)</span>
+        <span>dashed = normal</span>
+        <span><b>box area = total solute</b> (pure water makes a box wider and shorter)</span>
+      </div>
+      <svg id="cellv" viewBox="0 0 720 420" role="img" aria-label="Particle model of plasma, interstitium, muscle cells and brain cells"></svg>
+      <div class="note">Tissue model: every dot is a fixed amount. 1 blue dot = 0.25 L of water; 1 yellow (Na⁺) or purple (K⁺) dot = 71 mOsm, so normal osmolality is one solute dot per water dot. (Real water molecules outnumber solute particles about 190 to 1.) Dots only enter from upstream blood or leave downstream; each compartment is drawn at a size proportional to its water.</div>
+      <div class="controls">
+        <button class="btn" id="play">▶ Play</button>
+        <button class="btn ghost" id="replay">Replay</button>
+        <div class="phase" id="phase"></div>
+      </div>
+      <div class="read">
+        <div><span>Serum Na⁺</span><b id="rNa">142</b></div>
+        <div><span>Osmolality</span><b id="rOsm">285</b></div>
+        <div><span>ICF volume</span><b id="rICF">28.0 L</b></div>
+        <div><span>ECF volume</span><b id="rECF">14.0 L</b></div>
+      </div>
+    </div>
+    <div class="card info" id="info" style="margin-top:14px"></div>
+  </section>
+  <section id="allPane" class="card" hidden>
+    <div class="allgrid" id="allgrid"></div>
+    <div class="note">Click any cell to watch it animate. Placement follows the exam convention (SIADH and DI are euvolemic).</div>
+  </section>
+</main>
+
+<script>
+// ---------- model ----------
+const ICF0=28, ECF0=14, OSM0=285, ICFOS=ICF0*OSM0, ECFOS0=ECF0*OSM0;
+const BASEST={icfV:ICF0,ecfV:ECF0,osm:OSM0,ecfOs:ECFOS0};
+// one step: fluid hits the ECF (mid), then water equilibrates across cell membranes (end)
+function stepState(st,dW,dNa){
+  const ecfOs=Math.max(600,st.ecfOs+2*dNa);         // NaCl: 2 mOsm per mEq Na
+  const ecfV1=Math.max(4,st.ecfV+dW);
+  const osm=(ICFOS+ecfOs)/(st.icfV+ecfV1);
+  const end={icfV:ICFOS/osm,icfO:osm,ecfV:ecfOs/osm,ecfO:osm};
+  return {mid:{icfV:st.icfV,icfO:st.osm,ecfV:ecfV1,ecfO:ecfOs/ecfV1},end,ecfOs,
+          next:{icfV:end.icfV,ecfV:end.ecfV,osm,ecfOs}};
+}
+function model(dW,dNa){const r=stepState(BASEST,dW,dNa);return {start:{icfV:ICF0,icfO:OSM0,ecfV:ECF0,ecfO:OSM0},mid:r.mid,end:r.end,ecfOs:r.ecfOs};}
+function classify(s){
+  const na=s.icfO/2, d=(s.ecfV-ECF0)/ECF0;
+  return {nat: na<135?0: na>145?2:1, vol: d<-0.1?0: d>0.1?2:1};
+}
+
+// ---------- content ----------
+const VOL=["Hypovolemic","Euvolemic","Hypervolemic"], NAT=["Hyponatremia","Normonatremia","Hypernatremia"];
+const CELLS={
+ "0-2":{dw:-5,dn:-300,t:"Lost more water than salt",ex:"vomiting, sweating",
+   causes:"Vomiting, osmotic diarrhea (lactulose), osmotic diuresis (hyperglycemia, mannitol), heavy sweating, poor water intake.",
+   labs:"Urine osm high when the loss is outside the kidney. Urine Na > 20 points to the kidney (osmotic diuresis).",
+   tx:"Restore volume with isotonic saline if unstable, then free water. Lower Na no faster than ~10–12 mEq/L per day (cerebral edema)."},
+ "1-2":{dw:-3,dn:0,t:"Pure water loss, thirst keeps up",ex:"diabetes insipidus",
+   causes:"Central or nephrogenic diabetes insipidus, insensible losses. Two-thirds of the lost water comes out of cells, so ECF barely moves.",
+   labs:"Urine osm inappropriately low in DI. Desmopressin response separates central from nephrogenic.",
+   tx:"Replace free water; desmopressin for central DI; thiazide / low-salt diet for nephrogenic.",
+   why:[{dw:-5,dn:0,cap:'Kidneys lose free water with nothing to replace it → <b>both</b> compartments shrink (hypovolemic for a moment)'},
+        {dw:2,dn:0,cap:'High osmolality triggers <b>thirst</b> → drinking restores most of the volume'}],
+   whyNote:"Exams call DI euvolemic because thirst keeps up. If the patient can't drink (infant, unconscious, no thirst), DI slides into hypovolemic hypernatremia, which is why some tables file it under volume contraction."},
+ "2-2":{dw:1,dn:500,t:"Gained more salt than water",ex:"hypertonic saline",
+   causes:"Hypertonic saline, sodium bicarbonate, sodium-rich antibiotics. Primary hyperaldosteronism gives at most mild hypernatremia; aldosterone escape usually keeps Na⁺ near normal.",
+   labs:"Iatrogenic history is the giveaway.",
+   tx:"Stop the sodium; loop diuretic plus free water if overloaded."},
+ "0-1":{dw:-3,dn:-427,t:"Isotonic loss",ex:"secretory diarrhea, bleeding",
+   causes:"Secretory diarrhea (cholera toxin, VIPoma), hemorrhage, third spacing. Na and water leave in equal proportion.",
+   labs:"Na normal; BUN:Cr often > 20 from prerenal azotemia.",
+   tx:"Isotonic saline (or blood for hemorrhage)."},
+ "1-1":{dw:0,dn:0,t:"Normal",ex:"baseline",
+   causes:"Total body water ≈ 60% of body weight: two-thirds inside cells, one-third outside. Plasma is about a quarter of the ECF.",
+   labs:"Osm ≈ 2×Na + glucose/18 + BUN/2.8 ≈ 285.",tx:"—"},
+ "2-1":{dw:3,dn:427,t:"Isotonic gain",ex:"normal saline",
+   causes:"Too much isotonic saline. All of it stays in the ECF, mostly the interstitium.",
+   labs:"Na normal; edema, rising weight.",tx:"Stop fluids; diurese if needed."},
+ "0-0":{dw:-1.5,dn:-800,t:"Lost more salt than water",ex:"thiazides, Addison",
+   causes:"Thiazide diuretics, adrenal insufficiency (no aldosterone), GI losses replaced with plain water, cerebral salt wasting. Low volume triggers ADH, which holds onto water.",
+   labs:"Urine Na > 20 = kidney losing salt (diuretic, Addison). Urine Na < 20 = loss elsewhere (GI).",
+   tx:"Isotonic saline; it shuts off the volume-driven ADH."},
+ "1-0":{dw:4,dn:-200,t:"Water retained, salt let go",ex:"SIADH",
+   causes:"SIADH (small cell carcinoma, CNS or lung disease, drugs like SSRIs and carbamazepine), primary polydipsia, hypothyroidism, glucocorticoid deficiency, beer potomania.",
+   labs:"SIADH: urine osm > 100 and urine Na > 40. Primary polydipsia: urine osm < 100.",
+   tx:"Fluid restriction; hypertonic saline for severe symptoms. Raise Na ≤ 8–10 mEq/L in 24 h to avoid osmotic demyelination.",
+   why:[{dw:4.5,dn:0,cap:'ADH makes the kidney hold onto <b>free water</b> → ECF and ICF both expand (hypervolemic for a moment)'},
+        {dw:-0.5,dn:-200,cap:'Stretch → ANP up, aldosterone down → kidney dumps <b>Na⁺</b> → volume back to normal, Na⁺ even lower'}],
+   whyNote:"Exams call SIADH euvolemic: no edema, normal exam. The hidden step is the brief ECF expansion, then natriuresis (ANP up, aldosterone down) pulls volume back to normal and drops the Na⁺ further. That's why the urine Na⁺ is high."},
+ "2-0":{dw:7,dn:400,t:"Gained more water than salt",ex:"CHF, cirrhosis, nephrotic",
+   causes:"Heart failure, cirrhosis, nephrotic syndrome: arterial filling feels low, so RAAS and ADH stay on. Kidney failure can't excrete the water.",
+   labs:"Urine Na < 20 in CHF, cirrhosis, nephrotic. Urine Na > 20 in kidney failure.",
+   tx:"Salt and water restriction, loop diuretics, treat the underlying organ."}
+};
+
+// ---------- mini diagrams in grid ----------
+const grid=document.getElementById('grid');
+function miniSVG(s){
+  const kx=1.6, ky=0.38, base=56, x0=4;
+  const h=o=>(o-200)*ky;
+  const nI=ICF0*kx, nE=ECF0*kx, nh=h(OSM0);
+  return `<svg viewBox="0 0 110 60"><rect x="${x0}" y="${base-nh}" width="${nI}" height="${nh}" fill="none" stroke="var(--muted)" stroke-dasharray="2 2" stroke-width=".8"/>
+  <rect x="${x0+nI}" y="${base-nh}" width="${nE}" height="${nh}" fill="none" stroke="var(--muted)" stroke-dasharray="2 2" stroke-width=".8"/>
+  <rect x="${x0}" y="${base-h(s.icfO)}" width="${s.icfV*kx}" height="${h(s.icfO)}" fill="var(--icf)" opacity=".75"/>
+  <rect x="${x0+s.icfV*kx}" y="${base-h(s.ecfO)}" width="${s.ecfV*kx}" height="${h(s.ecfO)}" fill="var(--ecf)" opacity=".8"/></svg>`;
+}
+grid.innerHTML='<div></div>'+VOL.map(v=>`<div class="colh">${v}</div>`).join('');
+for(const nat of [2,1,0]){
+  grid.innerHTML+=`<div class="rowh">${NAT[nat]}</div>`;
+  for(const vol of [0,1,2]){
+    const k=`${vol}-${nat}`, c=CELLS[k], m=model(c.dw,c.dn);
+    grid.innerHTML+=`<div class="cell" data-k="${k}">${miniSVG(m.end)}<div class="t">${c.t}</div><div class="e">${c.ex}</div></div>`;
+  }
+}
+
+// ---------- big stage ----------
+const svg=document.getElementById('dy'), NS='http://www.w3.org/2000/svg';
+const X0=70, BASE=320, KX=11, KY=1.45, OMIN=170;
+const H=o=>Math.min(BASE-22,Math.max(2,(o-OMIN)*KY));   // capped so extreme mid-step values stay on the chart
+function el(t,a,p=svg){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p.appendChild(e);return e;}
+// axes
+el('line',{x1:X0,y1:BASE,x2:700,y2:BASE,stroke:'var(--muted)'});
+el('line',{x1:X0,y1:BASE,x2:X0,y2:30,stroke:'var(--muted)'});
+for(const o of [200,250,285,330,370]){el('text',{x:X0-8,y:BASE-H(o)+4,'text-anchor':'end','font-size':11,fill:'var(--muted)'}).textContent=o;
+  el('line',{x1:X0-4,y1:BASE-H(o),x2:X0,y2:BASE-H(o),stroke:'var(--muted)'});}
+const yl=el('text',{x:18,y:175,'font-size':11,fill:'var(--muted)',transform:'rotate(-90 18 175)','text-anchor':'middle'});yl.textContent='Osmolality (mOsm/kg) — axis starts at 170';
+el('text',{x:700,y:352,'font-size':11,fill:'var(--muted)','text-anchor':'end'}).textContent='Volume (L) →';
+// normal outline
+el('rect',{x:X0,y:BASE-H(OSM0),width:ICF0*KX,height:H(OSM0),fill:'none',stroke:'var(--muted)','stroke-dasharray':'5 4'});
+el('rect',{x:X0+ICF0*KX,y:BASE-H(OSM0),width:ECF0*KX,height:H(OSM0),fill:'none',stroke:'var(--muted)','stroke-dasharray':'5 4'});
+const gI=el('g',{}), gE=el('g',{});
+const rI=el('rect',{fill:'var(--icf-soft)',stroke:'var(--icf)','stroke-width':2,rx:3},gI);
+const rE=el('rect',{fill:'var(--ecf-soft)',stroke:'var(--ecf)','stroke-width':2,rx:3},gE);
+const lI=el('text',{'font-size':13,'font-weight':700,fill:'var(--icf)','text-anchor':'middle'});lI.textContent='ICF (inside cells)';
+const lE=el('text',{'font-size':13,'font-weight':700,fill:'var(--ecf)','text-anchor':'middle'});lE.textContent='ECF';
+const dotsLayer=el('g',{}), waterLayer=el('g',{});
+
+// ---------- stage particles: same units as the tissue model ----------
+// 1 blue dot = 0.25 L water, 1 solute dot = 71.25 mOsm. Dots are never created inside a box:
+// gains fly in from outside the body (right), losses fly out. K⁺ never leaves cells; Na⁺ never enters them.
+const OS_PER_DOT=60;   // legacy, unused
+const rnd=()=>Math.random();
+const SW=0.25, SS=SW*OSM0;
+let sp=[], SG=null;
+const clamp01=x=>Math.min(1,Math.max(0,x));
+function sMk(type,comp,u){const p={type,comp,u:u??rnd(),v:rnd(),fly:null,
+  e:el('circle',{r:type==='w'?2.2:2.4,fill:type==='w'?'var(--water)':type==='k'?'var(--k)':'var(--na)'},dotsLayer)};sp.push(p);return p;}
+function sSeed(){for(let i=0;i<112;i++){sMk('w','I');sMk('k','I');} for(let i=0;i<56;i++){sMk('w','E');sMk('na','E');}}
+const sCount=(t,c)=>sp.reduce((n,p)=>n+(p.type===t&&p.comp===c?1:0),0);
+function sPos(p){ if(p.comp==='out') return [SG.ex+SG.ew+70,p.oy];
+  const b=p.comp==='I'?SG.i:SG.e; return [b.x+4+p.u*Math.max(0,b.w-8), BASE-4-p.v*Math.max(0,b.h-8)]; }
+function sPick(t,c,pref){ // prefer dots near the edge they will cross
+  let c2=sp.filter(p=>p.type===t&&p.comp===c&&!p.fly); if(!c2.length) return null;
+  c2.sort((a,b)=>pref==='hi'?b.u-a.u:a.u-b.u); c2=c2.slice(0,Math.max(1,Math.ceil(c2.length*0.3)));
+  return c2[Math.floor(rnd()*c2.length)]; }
+function sLaunch(p,comp,u){const [fx,fy]=p.fly?p.fly.cur:sPos(p); p.comp=comp; if(comp==='out')p.oy=fy; else p.u=u;
+  p.fly={fx,fy,k:0,cur:[fx,fy]}; waterLayer.appendChild(p.e);}
+function sBody(t,f){
+  if(f>0){const p=sMk(t,'E',0.85+rnd()*0.15), x=SG.ex+SG.ew+70, y=BASE-4-p.v*Math.max(0,SG.e.h-8);
+    p.fly={fx:x,fy:y,k:0,cur:[x,y]}; waterLayer.appendChild(p.e);}
+  else if(f<0){const p=sPick(t,'E','hi'); if(p) sLaunch(p,'out');}
+}
+function sReconcile(s){   // one dot per route per frame: outside ⇄ ECF ⇄ ICF
+  const dI=Math.round(s.icfV/SW)-sCount('w','I'), dE=Math.round(s.ecfV/SW)-sCount('w','E')+dI;
+  if(dI>0){const p=sPick('w','E','lo'); if(p) sLaunch(p,'I',0.85+rnd()*0.15);}
+  else if(dI<0){const p=sPick('w','I','hi'); if(p) sLaunch(p,'E',rnd()*0.15);}
+  sBody('w',dE);
+  sBody('na',Math.round(s.ecfV*s.ecfO/SS)-sCount('na','E'));
+}
+function syncEDots(){}   // legacy hook, no-op
+let S={icfV:ICF0,icfO:OSM0,ecfV:ECF0,ecfO:OSM0};
+function draw(s){
+  const iw=s.icfV*KX, ih=H(s.icfO), ew=s.ecfV*KX, eh=H(s.ecfO), ex=X0+iw;
+  Object.assign(rI.attributes,{});
+  rI.setAttribute('x',X0);rI.setAttribute('y',BASE-ih);rI.setAttribute('width',iw);rI.setAttribute('height',ih);
+  rE.setAttribute('x',ex);rE.setAttribute('y',BASE-eh);rE.setAttribute('width',ew);rE.setAttribute('height',eh);
+  lI.setAttribute('x',X0+iw/2);lI.setAttribute('y',Math.max(14,BASE-ih-8));
+  lE.setAttribute('x',ex+ew/2);lE.setAttribute('y',Math.max(14,BASE-eh-8));
+  SG={i:{x:X0,w:iw,h:ih},e:{x:ex,w:ew,h:eh},ex,ew};
+  if(!sp.length) sSeed();
+  sReconcile(s);
+  sp=sp.filter(p=>{
+    if(!p.fly){p.u=clamp01(p.u+(rnd()-.5)*0.008);p.v=clamp01(p.v+(rnd()-.5)*0.012);}
+    let [x,y]=sPos(p);
+    if(p.fly){const f=p.fly; f.k=Math.min(1,f.k+1/24); const e=ease(f.k);
+      x=f.fx+(x-f.fx)*e; y=f.fy+(y-f.fy)*e; f.cur=[x,y];
+      if(p.comp==='out') p.e.setAttribute('opacity',(1-f.k).toFixed(2));
+      if(f.k>=1){ if(p.comp==='out'){p.e.remove();return false;} p.fly=null; dotsLayer.appendChild(p.e);} }
+    if(isFinite(x)&&isFinite(y)){p.e.setAttribute('cx',x.toFixed(1));p.e.setAttribute('cy',y.toFixed(1));}
+    return true;});
+  drawCells(s);
+  document.getElementById('rNa').textContent=Math.round(s.icfO===s.ecfO?s.ecfO/2:s.ecfO/2);
+  document.getElementById('rOsm').textContent=Math.round(s.ecfO);
+  document.getElementById('rICF').textContent=s.icfV.toFixed(1)+' L';
+  document.getElementById('rECF').textContent=s.ecfV.toFixed(1)+' L';
+}
+// water droplets
+let drops=[];
+function spawnDrops(){}   // decorative drops retired: every dot is now a conserved particle
+function stepDrops(){
+  const memX=X0+S.icfV*KX, edgeX=X0+(S.icfV+S.ecfV)*KX;
+  drops=drops.filter(d=>{
+    d.t+=d.sp; let x;
+    if(d.kind==='membrane') x= d.dir>0 ? memX-30+d.t*60 : memX+30-d.t*60;
+    else x= d.dir>0 ? edgeX+60-d.t*70 : edgeX-10+d.t*70;
+    // stay inside the box the water is entering/leaving: ECF height at the edge, the shorter box at the membrane
+    const h=d.kind==='membrane'?Math.min(H(S.icfO),H(S.ecfO)):H(S.ecfO);
+    d.e.setAttribute('cx',x);d.e.setAttribute('cy',BASE-5-d.v*Math.max(0,h-10));d.e.setAttribute('opacity',(1-d.t).toFixed(2));
+    if(d.t>=1){d.e.remove();return false;}return true;
+  });
+}
+
+// ---------- animation ----------
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const lerp=(a,b,t)=>({icfV:a.icfV+(b.icfV-a.icfV)*t,icfO:a.icfO+(b.icfO-a.icfO)*t,ecfV:a.ecfV+(b.ecfV-a.ecfV)*t,ecfO:a.ecfO+(b.ecfO-a.ecfO)*t});
+let anim=null;
+const phaseEl=document.getElementById('phase');
+// seq = [{dw,dn,cap}] applied one after another from the normal state.
+// Each step: 1a fluid arrives (box gets wider/narrower, height held) → 1b it mixes (height = new concentration)
+// → 2 water crosses cell membranes until both boxes are the same height.
+const NORMAL={icfV:ICF0,icfO:OSM0,ecfV:ECF0,ecfO:OSM0};
+const badge=el('text',{x:X0,y:352,'text-anchor':'start','font-size':12.5,'font-weight':600,fill:'var(--ink)'});
+function setBadge(s){badge.textContent=`ECF ${s.ecfV.toFixed(1)} L · ${Math.round(s.ecfO)} mOsm    ICF ${s.icfV.toFixed(1)} L · ${Math.round(s.icfO)} mOsm`;}
+function run(seq,instant){
+  if(anim) cancelAnimationFrame(anim.raf); anim=null;
+  let st=BASEST, from=NORMAL; const segs=[];
+  for(const s of seq){const r=stepState(st,s.dw,s.dn);segs.push({from,fromOs:st.ecfOs,mid:r.mid,end:r.end,ecfOs:r.ecfOs,cap:s.cap,dn:s.dn,dw:s.dw});from=r.end;st=r.next;}
+  const last=segs[segs.length-1];
+  if(instant){S=last.end; syncEDots(Math.round(last.ecfOs/OS_PER_DOT)); draw(S); setBadge(S); highlightLive(S); phaseEl.textContent=''; return;}
+  const pre0={...S};
+  const far=Math.abs(S.ecfV-ECF0)+Math.abs(S.icfV-ICF0)+Math.abs(S.ecfO-OSM0)/10+Math.abs(S.icfO-OSM0)/10;
+  const TR=far>0.15?750:0, T1a=1100, T1b=1000, P=350, T2=1700, GAP=900, SEG=T1a+T1b+P+T2+GAP;
+  const multi=segs.length>1; let t0=performance.now();
+  const tick=now=>{
+    let tt=now-t0;
+    if(tt<TR){ S=lerp(pre0,NORMAL,ease(tt/TR)); syncEDots(Math.round(ECFOS0/OS_PER_DOT));
+      phaseEl.innerHTML='<i>Back to normal…</i>'; draw(S); setBadge(S); stepDrops(); anim={raf:requestAnimationFrame(tick)}; return; }
+    tt-=TR;
+    if(tt>=segs.length*SEG-GAP){ S=last.end; draw(S); setBadge(S); stepDrops(); highlightLive(S); anim=null; return; }
+    const i=Math.min(segs.length-1,Math.floor(tt/SEG)), t=tt-i*SEG, m=segs[i];
+    const dV=m.mid.ecfV-m.from.ecfV, dO=m.mid.ecfO-m.from.ecfO, gradient=m.mid.ecfO-m.mid.icfO;
+    const pre=multi?`<b>Step ${i+1}/${segs.length} ·</b> `:'';
+    const wide={...m.mid,ecfO:m.from.ecfO};            // new width, old height
+    if(t<T1a){ const k=ease(t/T1a); S=lerp(m.from,wide,k);
+      // solute arrives/leaves alongside the water, paced through the step
+      syncEDots(Math.round((m.fromOs+(m.ecfOs-m.fromOs)*Math.min(1,t/(T1a*0.85)))/OS_PER_DOT),true);
+      if(Math.random()<0.3*(1-k)){
+        if(Math.abs(m.dw)>0.1) spawnDrops('edge',m.dw>0?1:-1);
+        // Na⁺ particles per water drop matches the fluid's tonicity (isotonic ≈ 1, 3% saline ≈ 3.6, D5W = 0)
+        const r=Math.min(4,(Math.abs(m.dn)/142)/Math.max(Math.abs(m.dw),0.5));
+        for(let j=0;j<Math.floor(r)+(Math.random()<r%1?1:0);j++) tissueNa(Math.sign(m.dn));
+      }
+      const what=m.cap?m.cap+' — ':'';
+      const W=Math.abs(m.dw)>0.1?(m.dw>0?1:-1):0, N=m.dn?(m.dn>0?1:-1):0, ratio=(Math.abs(m.dn)/142)/Math.max(Math.abs(m.dw),0.01);
+      const comp=!W&&!N?'Nothing enters or leaves'
+        :!N?(W>0?'Pure water enters':'Pure water leaves')
+        :!W?(N>0?'Na⁺ enters with little water':'Na⁺ leaves with little water')
+        :W===N?`Water + Na⁺ ${W>0?'enter':'leave'}`
+        :(W>0?'Water enters while Na⁺ leaves':'Water leaves while Na⁺ enters');
+      const tag=W&&N&&W===N?(Math.abs(ratio-1)<0.15?' (isotonic: same Na⁺ per liter as plasma)':ratio>1?' (hypertonic: more Na⁺ per liter than plasma)':' (hypotonic: less Na⁺ per liter than plasma)'):'';
+      phaseEl.innerHTML=pre+'<b>1a ·</b> '+what+comp+' the <b style="color:var(--ecf)">ECF</b>'+tag+(Math.abs(dV)<0.1?' → width barely changes'
+        :dV>0?` → box gets <b>wider</b> (+${dV.toFixed(1)} L)`:` → box gets <b>narrower</b> (${dV.toFixed(1)} L)`);
+    } else if(t<T1a+T1b){ const k=ease((t-T1a)/T1b); S=lerp(wide,m.mid,k);
+      phaseEl.innerHTML=pre+'<b>1b ·</b> '+(Math.abs(dO)<1?'Concentration unchanged (isotonic) → height stays put'
+        :dO<0?'Same Na⁺ now spread through more water → <b>diluted</b> → box gets <b>shorter</b>. (Box area = total solute.)'
+        :'More Na⁺ per liter → <b>concentrated</b> → box gets <b>taller</b>. (Box area = total solute.)');
+    } else if(t<T1a+T1b+P){ S=m.mid; }
+    else if(t<T1a+T1b+P+T2){ const k=ease((t-T1a-T1b-P)/T2); S=lerp(m.mid,m.end,k);
+      if(Math.abs(gradient)>1 && Math.random()<0.35*(1-k)) spawnDrops('membrane',gradient>0?1:-1);
+      phaseEl.innerHTML=pre+'<b>2 ·</b> '+(Math.abs(gradient)<1?'No osmotic gradient, so cells stay the same size':
+        gradient>0?'ECF is saltier → water leaves cells → cells <b>shrink</b> (Na⁺ can\'t follow; it stays outside cells)':'ECF is more dilute → water enters cells → cells <b>swell</b> (Na⁺ stays outside cells)');
+    } else { S=m.end; if(multi) highlightLive(S); }
+    draw(S); setBadge(S); stepDrops(); anim={raf:requestAnimationFrame(tick)};
+  };
+  anim={raf:requestAnimationFrame(tick)};
+}
+
+// ---------- tissue view: a conserved-particle scale model ----------
+// Every dot is a fixed amount: 1 blue dot = 0.25 L water, 1 yellow (Na⁺) or purple (K⁺) dot = 71.25 mOsm,
+// so at 285 mOsm/kg there is exactly one solute dot per water dot. Dots are never created or deleted
+// inside the tissue: they only enter from upstream blood (gains) or leave downstream (losses),
+// and otherwise move between compartments along routes that are physically open.
+// Left half = muscle (leaky capillary: water AND Na⁺ cross). Right half = brain (blood–brain barrier:
+// only water crosses; brain Na⁺/K⁺ stay put). Each compartment's drawn area is proportional to its water.
+const cv=document.getElementById('cellv');
+const WL=0.25, SOS=WL*OSM0;          // L per water dot, mOsm per solute dot
+const AREA=600;                       // px² per water dot (sets how big every compartment is drawn)
+const VT=6, FLOW=2.4, HALF=360, FIB=3;
+const lbl=(x,y,t,a={})=>{const e=el('text',Object.assign({x,y,'font-size':11.5,fill:'var(--ink)',class:'halo'},a),cv);e.textContent=t;return e;};
+const plasmaR=el('rect',{x:0,y:VT,width:720,fill:'var(--plasma)'},cv);
+const isfM=el('rect',{x:0,width:HALF,fill:'var(--ecf-soft)'},cv), isfB=el('rect',{x:HALF,width:HALF,fill:'var(--ecf-soft)'},cv);
+el('line',{x1:HALF,y1:0,x2:HALF,y2:0,stroke:'var(--muted)'},cv);
+const fibM=[],fibB=[];
+for(let i=0;i<FIB;i++){
+  const g=el('g',{},cv); const r=el('rect',{rx:10,fill:'var(--icf-soft)',stroke:'var(--icf)','stroke-width':2},g);
+  const st=el('g',{opacity:.3},g); fibM.push({r,st,g,lines:[]});
+  for(let k=0;k<20;k++) fibM[i].lines.push(el('line',{stroke:'var(--icf)','stroke-width':1},st));
+  const g2=el('g',{},cv); const r2=el('rect',{fill:'var(--icf-soft)',stroke:'var(--icf)','stroke-width':2},g2);
+  const dl=el('path',{stroke:'var(--icf)','stroke-width':3,'stroke-linecap':'round',fill:'none'},g2);
+  fibB.push({r:r2,dl});
+}
+const rbcL=el('g',{},cv);
+const rbcs=Array.from({length:6},(_,i)=>{const g=el('g',{},rbcL);el('ellipse',{rx:13,ry:9,fill:'var(--rbc)',opacity:.85},g);
+  const p=el('ellipse',{rx:5,ry:3.2,fill:'var(--rbcpal)'},g);return {x:i*125+rnd()*20,g,p};});
+el('line',{x1:0,y1:VT,x2:720,y2:VT,stroke:'var(--wall)','stroke-width':3},cv);
+const wallL=el('line',{x1:0,x2:HALF,stroke:'var(--wall)','stroke-width':3,'stroke-dasharray':'20 8'},cv);
+const wallR=el('line',{x1:HALF,x2:720,stroke:'var(--wall)','stroke-width':6},cv);
+const pLayer=el('g',{},cv), flyLayer=el('g',{},cv);
+const l1a=lbl(180,0,'Muscle: water + Na⁺ cross the capillary wall',{'text-anchor':'middle','font-weight':700});
+const l1b=lbl(540,0,'Brain: only water crosses (blood–brain barrier)',{'text-anchor':'middle','font-weight':700});
+const l2=lbl(360,0,'Interstitium (¾ of ECF): the teal space around the cells',{'text-anchor':'middle'});
+const l3=lbl(360,0,'',{'text-anchor':'middle','font-size':11,fill:'var(--muted)'});
+const capN=el('text',{x:360,y:0,'text-anchor':'middle','font-size':13,'font-weight':600,fill:'var(--ink)'},cv);
+const divider=cv.querySelector('line');
+
+// ---- particles ----
+const COL={w:'var(--water)',na:'var(--na)',k:'var(--k)'};
+let parts=[];
+function mk(type,comp,extra={}){
+  const p=Object.assign({type,comp,u:rnd(),v:rnd(),x:rnd()*720,slot:0,fly:null,leaving:false,
+    e:el('circle',{r:type==='w'?2.1:2.3,fill:COL[type]},pLayer)},extra);
+  assignSlot(p); parts.push(p); return p;
+}
+function assignSlot(p,near){
+  if(p.comp==='Cm'||p.comp==='Cb') p.slot=Math.floor(rnd()*FIB);
+  else if(p.comp==='Im'||p.comp==='Ib'){ const r=rnd(); p.slot=near&&r<0.55?0:r<0.8?Math.floor(rnd()*(FIB+1)):FIB+1+Math.floor(rnd()*2); }
+}
+const count=(type,comp)=>parts.reduce((n,p)=>n+(p.type===type&&p.comp===comp&&!p.leaving?1:0),0);
+
+// targets straight from the compartment model
+function targets(s){
+  const ecfOs=s.ecfV*s.ecfO, bw=OSM0/s.icfO;
+  return {
+    w:{P:2*Math.round(s.ecfV/4/WL), Im:Math.round(3*s.ecfV/4/WL), Cm:Math.round(s.icfV/WL),
+       Ib:Math.round(42*bw), Cb:Math.round(112*bw)},
+    na:{P:2*Math.round(ecfOs/4/SOS), Im:Math.round(3*ecfOs/4/SOS)}
+  };
+}
+// geometry from the dots actually present (so drawn size always matches the water inside)
+let G=null;
+function geom(){
+  const hv=Math.max(8,count('w','P')*AREA/720);
+  const top=VT+hv+2;
+  const half=(cw,iw,x0)=>{const H=(cw+iw)*AREA/HALF, hf=cw*AREA/FIB/(HALF-20), g=Math.max(2,(H-FIB*hf)/(FIB+1));return {x0,H,hf,g};};
+  return {hv,top,m:half(count('w','Cm'),count('w','Im'),0),b:half(count('w','Cb'),count('w','Ib'),HALF)};
+}
+function posOf(p){
+  if(p.comp==='P') return [p.x, VT+2+p.v*(G.hv-4)];
+  const h=(p.comp==='Cm'||p.comp==='Im')?G.m:G.b;
+  if(p.comp==='Cm'||p.comp==='Cb'){const y=G.top+h.g+p.slot*(h.hf+h.g);return [h.x0+14+p.u*(HALF-28), y+3+p.v*Math.max(0,h.hf-6)];}
+  if(p.slot<=FIB){const y=G.top+p.slot*(h.hf+h.g);return [h.x0+3+p.u*(HALF-6), y+1+p.v*Math.max(0,h.g-2)];}
+  const side=p.slot===FIB+1?0:HALF-10; return [h.x0+side+1+p.u*8, G.top+p.v*h.H];
+}
+function launch(p,comp,near){
+  const [fx,fy]=p.fly?p.fly.cur:posOf(p);
+  p.comp=comp; assignSlot(p,near);
+  if(comp==='P'){p.x=Math.min(715,fx+18);p.v=rnd();}
+  else if(near!==undefined){p.u=Math.min(1,Math.max(0,(fx+18-(comp==='Im'?0:HALF))/HALF));}
+  p.fly={fx,fy,k:0,cur:[fx,fy]}; flyLayer.appendChild(p.e);
+}
+function pick(type,comp,filter){
+  const c=parts.filter(p=>p.type===type&&p.comp===comp&&!p.leaving&&!p.fly&&(!filter||filter(p)));
+  return c.length?c[Math.floor(rnd()*c.length)]:null;
+}
+const inMuscle=p=>p.x>8&&p.x<HALF-12, inBrain=p=>p.x>HALF+8&&p.x<708;
+// one particle per route per frame, along a tree: body ⇄ plasma ⇄ interstitium ⇄ cells
+function reconcile(s){
+  const T=targets(s);
+  // water
+  const d=c=>T.w[c]-count('w',c);
+  const fCm=d('Cm'), fIm=d('Im')+fCm, fCb=d('Cb'), fIb=d('Ib')+fCb, fBody=d('P')+fIm+fIb;
+  move('w','Im','Cm',fCm); move('w','Ib','Cb',fCb);
+  move('w','P','Im',fIm,inMuscle); move('w','P','Ib',fIb,inBrain);
+  body('w',fBody);
+  // Na⁺: only body ⇄ plasma ⇄ muscle interstitium
+  const nIm=T.na.Im-count('na','Im'), nBody=T.na.P-count('na','P')+nIm;
+  move('na','P','Im',nIm,inMuscle); body('na',nBody);
+}
+function move(type,a,b,f,filterA){
+  if(f>0){const p=pick(type,a,filterA); if(p) launch(p,b,a==='P'?true:undefined);}
+  else if(f<0){const p=pick(type,b); if(p) launch(p,a,b==='Im'||b==='Ib'?true:undefined);}
+}
+function body(type,f){
+  if(f>0){ mk(type,'P',{x:-8}); }                             // arrives from upstream circulation
+  else if(f<0){ const p=pick(type,'P'); if(p) p.leaving=true; } // carried away downstream, then gone
+}
+function seed(){
+  const T=targets({icfV:ICF0,icfO:OSM0,ecfV:ECF0,ecfO:OSM0});
+  for(const c in T.w) for(let i=0;i<T.w[c];i++) mk('w',c);
+  for(const c in T.na) for(let i=0;i<T.na[c];i++) mk('na',c);
+  for(let i=0;i<42;i++) mk('na','Ib');                  // brain interstitial Na⁺: fixed by the BBB
+  for(let i=0;i<112;i++){mk('k','Cm');mk('k','Cb');}        // cell K⁺: fixed, never moves
+}
+// legacy hooks from the big diagram's water drops: the tissue now runs on its own particles
+function tissueEdge(){} function tissueNa(){} function tissueMembrane(){}
+
+let fI=1;
+function drawCells(s){
+  if(!parts.length) seed();
+  reconcile(s);
+  G=geom();
+  const cM=count('w','Cm'), cB=count('w','Cb');
+  fI=cB/112;
+  // vessel + walls
+  const vb=VT+G.hv;
+  plasmaR.setAttribute('height',G.hv);
+  for(const w of [wallL,wallR]){w.setAttribute('y1',vb+1);w.setAttribute('y2',vb+1);}
+  isfM.setAttribute('y',G.top);isfM.setAttribute('height',G.m.H);
+  isfB.setAttribute('y',G.top);isfB.setAttribute('height',G.b.H);
+  divider.setAttribute('y1',G.top);divider.setAttribute('y2',G.top+Math.max(G.m.H,G.b.H));
+  // cells
+  for(let i=0;i<FIB;i++){
+    const y=G.top+G.m.g+i*(G.m.hf+G.m.g), f=fibM[i];
+    f.r.setAttribute('x',10);f.r.setAttribute('y',y);f.r.setAttribute('width',HALF-20);f.r.setAttribute('height',G.m.hf);
+    f.lines.forEach((l,k)=>{const x=24+k*16;l.setAttribute('x1',x);l.setAttribute('x2',x);l.setAttribute('y1',y+4);l.setAttribute('y2',y+G.m.hf-4);});
+    const yb=G.top+G.b.g+i*(G.b.hf+G.b.g), n=fibB[i], hh=G.b.hf;
+    n.r.setAttribute('x',HALF+10);n.r.setAttribute('y',yb);n.r.setAttribute('width',HALF-20);n.r.setAttribute('height',hh);n.r.setAttribute('rx',hh/2);
+    const cy=yb+hh/2;
+    n.dl.setAttribute('d',`M${HALF+10} ${cy} l-7 -5 M${HALF+10} ${cy} l-7 5 M${720-10} ${cy} l7 -5 M${720-10} ${cy} l7 5`);
+  }
+  // RBCs ride the flow; they are cells too, so they swell/shrink with the brain-cell ratio
+  const rs=Math.min(1,(G.hv-2)/20);
+  rbcs.forEach(r=>{r.x+=FLOW;if(r.x>740)r.x=-20;
+    r.g.setAttribute('transform',`translate(${r.x.toFixed(1)} ${(VT+G.hv/2).toFixed(1)}) scale(${(rs*fI).toFixed(3)})`);
+    r.p.setAttribute('rx',Math.max(1,5-(fI-1)*40).toFixed(1));});
+  // particles
+  parts=parts.filter(p=>{
+    if(p.comp==='P'){p.x+=FLOW; if(p.x>722){ if(p.leaving){p.e.remove();return false;} p.x-=726; }}
+    else {p.u=Math.min(1,Math.max(0,p.u+(rnd()-.5)*0.006));}
+    p.v=Math.min(1,Math.max(0,p.v+(rnd()-.5)*0.01));
+    let [x,y]=posOf(p);
+    if(p.fly){const f=p.fly; f.k=Math.min(1,f.k+1/26); const e=ease(f.k);
+      x=f.fx+(x-f.fx)*e; y=f.fy+(y-f.fy)*e; f.cur=[x,y];
+      if(f.k>=1){p.fly=null;pLayer.appendChild(p.e);}}
+    if(isFinite(x)&&isFinite(y)){p.e.setAttribute('cx',x.toFixed(1));p.e.setAttribute('cy',y.toFixed(1));}
+    return true;});
+  // labels under the tissue
+  const b=G.top+Math.max(G.m.H,G.b.H);
+  l1a.setAttribute('y',b+17);l1b.setAttribute('y',b+17);l2.setAttribute('y',b+34);l3.setAttribute('y',b+50);capN.setAttribute('y',b+70);
+  l3.textContent=`Muscle side, solute : water dots: plasma ${count('na','P')/2|0}:${count('w','P')/2|0} · interstitium ${count('na','Im')}:${count('w','Im')} · cells (K⁺) ${count('k','Cm')}:${cM}`;
+  const sw=fI>1.03, sh=fI<0.97;
+  capN.textContent=sw?'Brain cells swell (cerebral edema): headache, confusion, seizures.'
+    :sh?'Brain cells shrink: lethargy, irritability; if severe, torn bridging veins.'
+    :'Cells at normal size';
+}
+
+function idle(){ if(!anim){ draw(S); stepDrops(); } requestAnimationFrame(idle); }
+
+// ---------- UI ----------
+const info=document.getElementById('info');
+const whyOn=()=>document.getElementById('why').checked;
+function highlightLive(s){
+  const c=classify(s), on=mode==='lab'||(whyOn()&&CELLS[sel].why);
+  document.querySelectorAll('.cell').forEach(x=>x.classList.toggle('live',!!on&&x.dataset.k===`${c.vol}-${c.nat}`));
+}
+function playSel(){const c=CELLS[sel];document.querySelectorAll('.cell').forEach(x=>x.classList.remove('live'));run(whyOn()&&c.why?c.why:[{dw:c.dw,dn:c.dn}]);}
+function showInfo(k){
+  const [vol,nat]=k.split('-').map(Number), c=CELLS[k];
+  const col=['var(--hypo)','var(--iso)','var(--hyper)'];
+  info.innerHTML=`<span class="tag" style="background:${col[vol]};color:#fff">${VOL[vol]}</span><span class="tag" style="background:${col[nat]};color:#fff">${NAT[nat]}</span>
+  <h2>${c.t}</h2>
+  <dl><dt>Causes</dt><dd>${c.causes}</dd><dt>Labs</dt><dd>${c.labs}</dd><dt>Treatment</dt><dd>${c.tx}</dd></dl>
+  ${c.whyNote?`<div class="whybox"><b>Exam answer vs. physiology:</b> ${c.whyNote} ${whyOn()?'':'<i>Tick “Why?” to watch it.</i>'}</div>`:''}`;
+  info.animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:320,easing:'ease-out'});
+}
+let mode='grid', sel='1-0';
+document.querySelectorAll('.cell').forEach(x=>x.onclick=()=>{
+  if(mode!=='grid')setMode('grid');
+  sel=x.dataset.k; document.querySelectorAll('.cell').forEach(y=>y.classList.toggle('on',y===x));
+  showInfo(sel); playSel();
+});
+document.getElementById('play').onclick=document.getElementById('replay').onclick=()=>{
+  if(mode==='grid')playSel(); else labRun(false);
+};
+document.getElementById('why').onchange=()=>{showInfo(sel);playSel();};
+const w=document.getElementById('w'), n=document.getElementById('n');
+function labLabels(){document.getElementById('wV').textContent=(w.value>0?'+':'')+w.value+' L';document.getElementById('nV').textContent=(n.value>0?'+':'')+n.value+' mEq';}
+function labRun(instant){labLabels(); run([{dw:+w.value,dn:+n.value}],instant);}
+w.oninput=n.oninput=()=>labRun(true);
+w.onchange=n.onchange=()=>labRun(false);
+document.querySelectorAll('.quick button').forEach(b=>b.onclick=()=>{
+  if(b.dataset.reset){w.value=0;n.value=0;} else {w.value=Math.min(8,Math.max(-6,+w.value+ +b.dataset.w)); n.value=Math.min(900,Math.max(-900,+n.value+ +b.dataset.n));}
+  labRun(false);
+});
+const ag=document.getElementById('allgrid');
+ag.innerHTML='<div class="sp"></div>'+VOL.map(v=>`<div class="colh">${v}</div>`).join('');
+for(const nat of [2,1,0]){
+  ag.innerHTML+=`<div class="rowh">${NAT[nat]}</div>`;
+  for(const vol of [0,1,2]){const k=`${vol}-${nat}`,c=CELLS[k];
+    ag.innerHTML+=`<div class="acell" data-k="${k}">${miniSVG(model(c.dw,c.dn).end)}<div class="tg">${VOL[vol]} · ${NAT[nat]}</div><h3>${c.t}</h3>
+    <p><span class="lb">Causes</span><br>${c.causes}</p><p><span class="lb">Labs</span><br>${c.labs}</p><p><span class="lb">Treatment</span><br>${c.tx}</p></div>`;}
+}
+ag.querySelectorAll('.acell').forEach(x=>x.onclick=()=>{document.querySelector(`.cell[data-k="${x.dataset.k}"]`).click();window.scrollTo({top:0,behavior:'smooth'});});
+function setMode(m){
+  mode=m; ['Grid','Lab','All'].forEach(t=>document.getElementById('tab'+t).classList.toggle('on',m===t.toLowerCase()));
+  document.getElementById('main').classList.toggle('all',m==='all'); document.getElementById('allPane').hidden=m!=='all';
+  if(m==='all') return;
+  document.getElementById('gridPane').hidden=m!=='grid'; document.getElementById('labPane').hidden=m!=='lab';
+  document.querySelectorAll('.cell').forEach(x=>x.classList.remove('live'));
+  if(m==='lab'){ info.innerHTML='<h2>Fluid lab</h2><div>Add or remove water and sodium and watch where you land on the grid. Try D5W versus normal saline versus 3% saline, or recreate SIADH (water in, a little salt out).</div><div class="note">Model: 42 L total body water, 28 L ICF / 14 L ECF, osm 285, Na⁺ ≈ osm ÷ 2 with glucose and BUN held normal. Volume status is judged by ECF change (±10%).</div>'; labRun(false); }
+  else { showInfo(sel); }
+}
+document.getElementById('tabGrid').onclick=()=>setMode('grid');
+document.getElementById('tabLab').onclick=()=>setMode('lab');
+document.getElementById('tabAll').onclick=()=>setMode('all');
+(function(){
+  const root=document.documentElement, btn=document.getElementById('theme');
+  const sys=()=>matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark=()=>root.dataset.theme?root.dataset.theme==='dark':sys();
+  try{const t=localStorage.getItem('physioviz-theme'); if(t) root.dataset.theme=t;}catch(e){}
+  const label=()=>btn.textContent=isDark()?'☀ Light':'☾ Dark';
+  btn.onclick=()=>{root.dataset.theme=isDark()?'light':'dark'; try{localStorage.setItem('physioviz-theme',root.dataset.theme);}catch(e){} label();};
+  label();
+})();
+labLabels();
+document.querySelector(`.cell[data-k="${sel}"]`).classList.add('on'); showInfo(sel);
+draw(S); idle();
+setTimeout(playSel,400);
+</script>
+</body>
+</html>
